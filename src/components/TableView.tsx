@@ -50,7 +50,7 @@ const CardStrip = ({
       const backClassName = shouldAnimateCard ? "playing-card dealing-card" : "playing-card";
       const delayMs = dealAnimationTargets === null ? (animationStartIndex + index) * 120 : 0;
       const animationStyle = shouldAnimateCard ? { animationDelay: `${delayMs}ms` } : undefined;
-      const keyPrefix = dealAnimationActive ? `${dealAnimationTick}-` : "";
+      const keyPrefix = shouldAnimateCard ? `${dealAnimationTick}-` : "";
 
       if (hideSecondCard && index === 1) {
         const backImage = cardImageMap.BACK;
@@ -79,22 +79,24 @@ const CardStrip = ({
         const flipKey = `${holeRevealTick}-dealer-hole-reveal`;
         return (
           <span key={flipKey} className="hole-reveal-card">
-            <span className="hole-reveal-face hole-reveal-front">
-              {frontImage ? (
-                <img src={frontImage} alt={`${card.rank} of ${card.suit}`} className="playing-card" />
-              ) : (
-                <span className="card-fallback">
-                  {card.rank}
-                  {card.suit[0].toUpperCase()}
-                </span>
-              )}
-            </span>
-            <span className="hole-reveal-face hole-reveal-back">
-              {backImage ? (
-                <img src={backImage} alt="Dealer hole card" className="playing-card" />
-              ) : (
-                <span className="card-back">?</span>
-              )}
+            <span className="hole-reveal-card-inner">
+              <span className="hole-reveal-face hole-reveal-front">
+                {frontImage ? (
+                  <img src={frontImage} alt={`${card.rank} of ${card.suit}`} className="playing-card" />
+                ) : (
+                  <span className="card-fallback">
+                    {card.rank}
+                    {card.suit[0].toUpperCase()}
+                  </span>
+                )}
+              </span>
+              <span className="hole-reveal-face hole-reveal-back">
+                {backImage ? (
+                  <img src={backImage} alt="Dealer hole card" className="playing-card" />
+                ) : (
+                  <span className="card-back">?</span>
+                )}
+              </span>
             </span>
           </span>
         );

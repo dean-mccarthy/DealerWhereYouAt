@@ -647,12 +647,18 @@ button:disabled {
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   transform-origin: center center;
-  transform-style: preserve-3d;
-  animation: hole-card-flip 260ms ease-out forwards;
   line-height: 0;
   vertical-align: top;
   margin: 0;
   padding: 0;
+}
+
+.hole-reveal-card-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform-origin: center center;
+  animation: hole-card-flip 260ms ease-out forwards;
 }
 
 .hole-reveal-face {
@@ -660,6 +666,7 @@ button:disabled {
   inset: 0;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
 }
 
 .hole-reveal-front {
