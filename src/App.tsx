@@ -29,6 +29,7 @@ const DRAW_ANIMATION_MS = 420;
 const HOLE_REVEAL_START_DELAY_MS = 350;
 const HOLE_REVEAL_ANIMATION_MS = 300;
 const HOLE_REVEAL_AFTER_BUST_DRAW_DELAY_MS = 460;
+const MOVE_RESULT_POPUP_MS = 950;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function App() {
@@ -49,6 +50,9 @@ function App() {
   const [holeRevealActive, setHoleRevealActive] = useState(false);
   const [holeRevealTick, setHoleRevealTick] = useState(0);
   const [holeCardRevealed, setHoleCardRevealed] = useState(false);
+  const [moveResultIndicator, setMoveResultIndicator] = useState<{ isCorrect: boolean; tick: number } | null>(
+    null,
+  );
   const dealerAnimationRunningRef = useRef(false);
   const dealerRevealDelayMsRef = useRef(DEALER_REVEAL_DELAY_MS);
   const holeRevealStartDelayMsRef = useRef(HOLE_REVEAL_START_DELAY_MS);
@@ -56,6 +60,7 @@ function App() {
   const dealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holeRevealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holeRevealStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const moveResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousRoundPhaseRef = useRef<RoundState["phase"] | null>(null);
 
   useEffect(() => {
@@ -81,6 +86,7 @@ function App() {
       if (dealTimeoutRef.current) clearTimeout(dealTimeoutRef.current);
       if (holeRevealTimeoutRef.current) clearTimeout(holeRevealTimeoutRef.current);
       if (holeRevealStartTimeoutRef.current) clearTimeout(holeRevealStartTimeoutRef.current);
+      if (moveResultTimeoutRef.current) clearTimeout(moveResultTimeoutRef.current);
     },
     [],
   );
@@ -198,6 +204,14 @@ function App() {
     }, durationMs);
   };
 
+  const showMoveResultIndicator = (isCorrect: boolean) => {
+    setMoveResultIndicator({ isCorrect, tick: Date.now() });
+    if (moveResultTimeoutRef.current) clearTimeout(moveResultTimeoutRef.current);
+    moveResultTimeoutRef.current = setTimeout(() => {
+      setMoveResultIndicator(null);
+    }, MOVE_RESULT_POPUP_MS);
+  };
+
   const handleDeal = () => {
     if (round && round.phase !== "roundOver") {
       setMessage("Finish the current round first.");
@@ -254,6 +268,7 @@ function App() {
       action,
     );
     setFeedbackHistory((value) => [...value, feedback]);
+    showMoveResultIndicator(feedback.isCorrect);
 
     if (action === "split") {
       const runSplitAnimation = async () => {
@@ -417,6 +432,16 @@ function App() {
               splitAnimating={splitAnimating}
             />
           </div>
+          {moveResultIndicator ? (
+            <div
+              key={moveResultIndicator.tick}
+              className={moveResultIndicator.isCorrect ? "move-result-popup correct" : "move-result-popup incorrect"}
+              aria-live="polite"
+              role="status"
+            >
+              {moveResultIndicator.isCorrect ? "✓" : "✕"}
+            </div>
+          ) : null}
           <button type="button" className="deal-button" onClick={handleDeal} disabled={dealDisabled}>
             Deal
           </button>

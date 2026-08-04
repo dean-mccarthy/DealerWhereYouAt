@@ -400,6 +400,54 @@ body {
   transform: translateY(-50%);
 }
 
+.move-result-popup {
+  position: absolute;
+  right: 32px;
+  top: calc(50% - 108px);
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  font-weight: 800;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+  z-index: 5;
+  animation: move-result-pop 950ms ease-out forwards;
+  pointer-events: none;
+}
+
+.move-result-popup.correct {
+  background: rgba(36, 156, 78, 0.9);
+  color: #f3fff3;
+}
+
+.move-result-popup.incorrect {
+  background: rgba(183, 43, 43, 0.92);
+  color: #fff4f4;
+}
+
+@keyframes move-result-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+}
+
 .training-overlay {
   position: absolute;
   top: 16px;
@@ -764,6 +812,12 @@ button:disabled {
     top: auto;
     bottom: 230px;
     transform: none;
+  }
+
+  .move-result-popup {
+    right: 24px;
+    top: auto;
+    bottom: 330px;
   }
 
   .actions {
