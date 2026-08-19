@@ -3,12 +3,15 @@ import { cardCode } from "../game/cards";
 import type { Card } from "../game/types";
 import type { RoundState } from "../game/types";
 
+const DEAL_CARD_STAGGER_MS = 120;
+
 interface TableViewProps {
   round: RoundState | null;
   cardImageMap: Record<string, string>;
   dealAnimationActive: boolean;
   dealAnimationTick: number;
   dealAnimationTargets: string[] | null;
+  dealAnimationDurationMs: number;
   holeRevealActive: boolean;
   holeRevealTick: number;
   holeCardRevealed: boolean;
@@ -24,6 +27,7 @@ const CardStrip = ({
   animationStartIndex = 0,
   stripId,
   dealAnimationTargets = null,
+  dealAnimationDurationMs = 520,
   holeRevealActive = false,
   holeRevealTick = 0,
   reserveSecondSlot = false,
@@ -36,6 +40,7 @@ const CardStrip = ({
   animationStartIndex?: number;
   stripId: string;
   dealAnimationTargets?: string[] | null;
+  dealAnimationDurationMs?: number;
   holeRevealActive?: boolean;
   holeRevealTick?: number;
   reserveSecondSlot?: boolean;
@@ -48,8 +53,10 @@ const CardStrip = ({
       const cardClassName = shouldAnimateCard ? "playing-card dealing-card" : "playing-card";
       const fallbackClassName = shouldAnimateCard ? "card-fallback dealing-card" : "card-fallback";
       const backClassName = shouldAnimateCard ? "playing-card dealing-card" : "playing-card";
-      const delayMs = dealAnimationTargets === null ? (animationStartIndex + index) * 120 : 0;
-      const animationStyle = shouldAnimateCard ? { animationDelay: `${delayMs}ms` } : undefined;
+      const delayMs = dealAnimationTargets === null ? (animationStartIndex + index) * DEAL_CARD_STAGGER_MS : 0;
+      const animationStyle = shouldAnimateCard
+        ? { animationDelay: `${delayMs}ms`, animationDuration: `${dealAnimationDurationMs}ms` }
+        : undefined;
       const keyPrefix = shouldAnimateCard ? `${dealAnimationTick}-` : "";
 
       if (hideSecondCard && index === 1) {
@@ -132,6 +139,7 @@ export const TableView = ({
   dealAnimationActive,
   dealAnimationTick,
   dealAnimationTargets,
+  dealAnimationDurationMs,
   holeRevealActive,
   holeRevealTick,
   holeCardRevealed,
@@ -163,6 +171,7 @@ export const TableView = ({
           animationStartIndex={0}
           stripId="dealer"
           dealAnimationTargets={dealAnimationTargets}
+          dealAnimationDurationMs={dealAnimationDurationMs}
           holeRevealActive={holeRevealActive}
           holeRevealTick={holeRevealTick}
         />
@@ -185,6 +194,7 @@ export const TableView = ({
                 animationStartIndex={2 + index * 2}
                 stripId={`player-${hand.id}`}
                 dealAnimationTargets={dealAnimationTargets}
+                dealAnimationDurationMs={dealAnimationDurationMs}
                 holeRevealActive={holeRevealActive}
                 holeRevealTick={holeRevealTick}
                 reserveSecondSlot={splitAnimating && hand.isSplitHand && hand.cards.length === 1}

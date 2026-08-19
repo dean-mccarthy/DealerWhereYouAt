@@ -635,11 +635,11 @@ button:disabled {
 @keyframes deal-card-in {
   0% {
     opacity: 0;
-    transform: translate3d(-230px, 130px, 0) rotate(-18deg);
+    transform: translate3d(-120px, 72px, 0) rotate(-10deg);
   }
-  70% {
+  62% {
     opacity: 1;
-    transform: translate3d(10px, -6px, 0) rotate(3deg);
+    transform: translate3d(6px, -4px, 0) rotate(2deg);
   }
   100% {
     opacity: 1;
@@ -706,7 +706,7 @@ button:disabled {
   inset: 0;
   transform-style: preserve-3d;
   transform-origin: center center;
-  animation: hole-card-flip 260ms ease-out forwards;
+  animation: hole-card-flip 300ms ease-out forwards;
 }
 
 .hole-reveal-face {

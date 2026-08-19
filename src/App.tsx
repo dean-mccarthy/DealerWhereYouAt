@@ -22,14 +22,20 @@ const ensureShoe = (shoe: Card[]): Card[] =>
     : shoe;
 const DEALER_REVEAL_DELAY_MS = 900;
 const DEALER_STEP_DELAY_MS = 1000;
-const SPLIT_STEP_DELAY_MS = 450;
+const SPLIT_STEP_DELAY_MS = 620;
 const SHUFFLE_ANIMATION_MS = 1300;
-const DEAL_ANIMATION_MS = 700;
-const DRAW_ANIMATION_MS = 420;
+const INITIAL_DEAL_CARD_ANIMATION_MS = 520;
+const DRAW_CARD_ANIMATION_MS = 360;
+const DRAW_ANIMATION_BUFFER_MS = 70;
 const HOLE_REVEAL_START_DELAY_MS = 350;
 const HOLE_REVEAL_ANIMATION_MS = 300;
 const HOLE_REVEAL_AFTER_BUST_DRAW_DELAY_MS = 460;
 const MOVE_RESULT_POPUP_MS = 950;
+const DEAL_CARD_STAGGER_MS = 120;
+const INITIAL_DEAL_CARD_COUNT = 4;
+const DEAL_ANIMATION_MS =
+  INITIAL_DEAL_CARD_ANIMATION_MS + DEAL_CARD_STAGGER_MS * (INITIAL_DEAL_CARD_COUNT - 1) + 120;
+const DRAW_ANIMATION_MS = DRAW_CARD_ANIMATION_MS + DRAW_ANIMATION_BUFFER_MS;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function App() {
@@ -47,6 +53,7 @@ function App() {
   const [dealAnimationActive, setDealAnimationActive] = useState(false);
   const [dealAnimationTick, setDealAnimationTick] = useState(0);
   const [dealAnimationTargets, setDealAnimationTargets] = useState<string[] | null>(null);
+  const [dealAnimationDurationMs, setDealAnimationDurationMs] = useState(INITIAL_DEAL_CARD_ANIMATION_MS);
   const [holeRevealActive, setHoleRevealActive] = useState(false);
   const [holeRevealTick, setHoleRevealTick] = useState(0);
   const [holeCardRevealed, setHoleCardRevealed] = useState(false);
@@ -154,7 +161,7 @@ function App() {
         animatedShoe = advanced.shoe;
         if (animatedRound.dealerHand.length > dealerCardCountBefore) {
           const newestDealerCardIndex = animatedRound.dealerHand.length - 1;
-          triggerDealAnimation([`dealer-${newestDealerCardIndex}`], DRAW_ANIMATION_MS);
+          triggerDealAnimation([`dealer-${newestDealerCardIndex}`], DRAW_ANIMATION_MS, DRAW_CARD_ANIMATION_MS);
         }
         setRound(animatedRound);
         setShoe(animatedShoe);
@@ -193,8 +200,13 @@ function App() {
     return null;
   };
 
-  const triggerDealAnimation = (targets: string[] | null, durationMs: number) => {
+  const triggerDealAnimation = (
+    targets: string[] | null,
+    durationMs: number,
+    cardAnimationDurationMs: number,
+  ) => {
     setDealAnimationTargets(targets);
+    setDealAnimationDurationMs(cardAnimationDurationMs);
     setDealAnimationActive(true);
     setDealAnimationTick((value) => value + 1);
     if (dealTimeoutRef.current) clearTimeout(dealTimeoutRef.current);
@@ -238,7 +250,7 @@ function App() {
       startedRoundOutcomes?.reduce((sum, entry) => sum + entry.returnedCredits, 0) ?? 0;
     setShoe(started.shoe);
     setRound(started.round);
-    triggerDealAnimation(null, DEAL_ANIMATION_MS);
+    triggerDealAnimation(null, DEAL_ANIMATION_MS, INITIAL_DEAL_CARD_ANIMATION_MS);
     setCredits((value) => value - bet + immediateReturnedCredits);
     setFeedbackHistory([]);
     setLastRecommendation(null);
@@ -321,7 +333,11 @@ function App() {
         const leftDeal = draw(nextShoe);
         nextShoe = leftDeal.shoe;
         splitRound.playerHands[round.activeHandIndex].cards.push(leftDeal.card);
-        triggerDealAnimation([`player-${splitRound.playerHands[round.activeHandIndex].id}-1`], DRAW_ANIMATION_MS);
+        triggerDealAnimation(
+          [`player-${splitRound.playerHands[round.activeHandIndex].id}-1`],
+          DRAW_ANIMATION_MS,
+          DRAW_CARD_ANIMATION_MS,
+        );
         setRound({
           ...splitRound,
           dealerHand: [...splitRound.dealerHand],
@@ -337,6 +353,7 @@ function App() {
         triggerDealAnimation(
           [`player-${splitRound.playerHands[round.activeHandIndex + 1].id}-1`],
           DRAW_ANIMATION_MS,
+          DRAW_CARD_ANIMATION_MS,
         );
         setRound({
           ...splitRound,
@@ -372,7 +389,7 @@ function App() {
       const updatedHand = applied.result.round.playerHands.find((playerHand) => playerHand.id === hand.id);
       if (updatedHand) {
         const newestCardIndex = updatedHand.cards.length - 1;
-        triggerDealAnimation([`player-${updatedHand.id}-${newestCardIndex}`], DRAW_ANIMATION_MS);
+        triggerDealAnimation([`player-${updatedHand.id}-${newestCardIndex}`], DRAW_ANIMATION_MS, DRAW_CARD_ANIMATION_MS);
       }
     }
     setRound(applied.result.round);
@@ -426,6 +443,7 @@ function App() {
               dealAnimationActive={dealAnimationActive}
               dealAnimationTick={dealAnimationTick}
               dealAnimationTargets={dealAnimationTargets}
+              dealAnimationDurationMs={dealAnimationDurationMs}
               holeRevealActive={holeRevealActive}
               holeRevealTick={holeRevealTick}
               holeCardRevealed={holeCardRevealed}
