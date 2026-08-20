@@ -7,6 +7,7 @@ const DEAL_CARD_STAGGER_MS = 120;
 
 interface TableViewProps {
   round: RoundState | null;
+  gameMode: "classic" | "freeBet";
   cardImageMap: Record<string, string>;
   dealAnimationActive: boolean;
   dealAnimationTick: number;
@@ -135,6 +136,7 @@ const CardStrip = ({
 
 export const TableView = ({
   round,
+  gameMode,
   cardImageMap,
   dealAnimationActive,
   dealAnimationTick,
@@ -157,6 +159,12 @@ export const TableView = ({
   const shouldHideDealerHoleCard =
     round.phase === "playerTurn" || (round.phase === "dealerTurn" && !holeCardRevealed);
   const dealerTotal = shouldHideDealerHoleCard ? "-" : String(dealerValue.total);
+  const dealerBustLabel =
+    !shouldHideDealerHoleCard && dealerValue.isBust
+      ? gameMode === "freeBet" && dealerValue.total === 22
+        ? " Push!"
+        : " Bust!"
+      : null;
 
   return (
     <section className="panel table-panel">
@@ -177,7 +185,7 @@ export const TableView = ({
         />
         <p>
           Total: {dealerTotal}
-          {!shouldHideDealerHoleCard && dealerValue.isBust ? <span className="bad"> Bust!</span> : null}
+          {dealerBustLabel ? <span className="bad">{dealerBustLabel}</span> : null}
         </p>
       </div>
       <div className="player-hands">

@@ -1,4 +1,5 @@
 import { evaluateHand, canSplit } from "./hand";
+import { cardNumericValue } from "./cards";
 import { draw } from "./shoe";
 import type {
   ActionResult,
@@ -29,6 +30,21 @@ const findNextActiveIndex = (hands: HandState[], current: number): number => {
   return -1;
 };
 
+const isTenValueCard = (card: Card): boolean => cardNumericValue(card) === 10;
+
+const canFreeBetSplit = (hand: HandState): boolean => {
+  if (hand.cards.length !== 2) return false;
+  const [firstCard, secondCard] = hand.cards;
+  if (firstCard.rank !== secondCard.rank) return false;
+  return !isTenValueCard(firstCard);
+};
+
+const canFreeBetDouble = (hand: HandState): boolean => {
+  if (hand.cards.length !== 2) return false;
+  const value = evaluateHand(hand.cards);
+  return !value.isSoft && value.total >= 9 && value.total <= 11;
+};
+
 export const legalActions = (round: RoundState, rules: Rules): PlayerAction[] => {
   if (round.phase !== "playerTurn") return [];
   const hand = round.playerHands[round.activeHandIndex];
@@ -36,7 +52,8 @@ export const legalActions = (round: RoundState, rules: Rules): PlayerAction[] =>
   if (value.isBust || hand.stood) return [];
 
   const actions: PlayerAction[] = ["hit", "stand"];
-  if (hand.cards.length === 2 && (!hand.isSplitHand || rules.doubleAfterSplit)) {
+  const canAttemptDouble = hand.cards.length === 2 && (!hand.isSplitHand || rules.doubleAfterSplit);
+  if (canAttemptDouble) {
     actions.push("double");
   }
   if (canSplit(hand)) {
@@ -66,6 +83,7 @@ export const startRound = (
         id: nextHandId(),
         cards: [first.card, second.card],
         bet,
+        freeBetPortion: 0,
         stood: false,
         doubled: false,
         isSplitHand: false,
@@ -163,15 +181,24 @@ export const applyAction = (
     hand.stood = true;
     feedbackMessage = "You stand";
   } else if (action === "double") {
+    const freeBetDoubleAllowed = rules.gameMode === "freeBet" && canFreeBetDouble(hand);
     const dealt = draw(nextShoe);
     hand.cards.push(dealt.card);
     nextShoe = dealt.shoe;
+    const doubleAmount = hand.bet;
     hand.bet *= 2;
+    if (freeBetDoubleAllowed) {
+      hand.freeBetPortion += doubleAmount;
+      additionalWager = 0;
+      feedbackMessage = "You doubled for free";
+    } else {
+      additionalWager = hand.bet / 2;
+      feedbackMessage = "You doubled";
+    }
     hand.doubled = true;
     hand.stood = true;
-    additionalWager = hand.bet / 2;
-    feedbackMessage = "You doubled";
   } else if (action === "split") {
+    const freeSplitAllowed = rules.gameMode === "freeBet" && canFreeBetSplit(hand);
     const [leftCard, rightCard] = hand.cards;
     const leftDeal = draw(nextShoe);
     nextShoe = leftDeal.shoe;
@@ -182,6 +209,7 @@ export const applyAction = (
       id: nextHandId(),
       cards: [leftCard, leftDeal.card],
       bet: originalBet,
+      freeBetPortion: 0,
       stood: false,
       doubled: false,
       isSplitHand: true,
@@ -190,13 +218,19 @@ export const applyAction = (
       id: nextHandId(),
       cards: [rightCard, rightDeal.card],
       bet: originalBet,
+      freeBetPortion: freeSplitAllowed ? originalBet : 0,
       stood: false,
       doubled: false,
       isSplitHand: true,
     };
     next.playerHands.splice(next.activeHandIndex, 1, left, right);
-    additionalWager = originalBet;
-    feedbackMessage = "You split";
+    if (freeSplitAllowed) {
+      additionalWager = 0;
+      feedbackMessage = "You split for free";
+    } else {
+      additionalWager = originalBet;
+      feedbackMessage = "You split";
+    }
   }
 
   const activeHand = next.playerHands[next.activeHandIndex];
@@ -219,6 +253,7 @@ export const applyAction = (
 
 export const resolveOutcomes = (round: RoundState, rules: Rules): HandOutcome[] => {
   const dealerValue = evaluateHand(round.dealerHand);
+  const dealerPush22 = rules.gameMode === "freeBet" && dealerValue.total === 22;
 
   return round.playerHands.map((hand) => {
     const playerValue = evaluateHand(hand.cards);
@@ -234,11 +269,15 @@ export const resolveOutcomes = (round: RoundState, rules: Rules): HandOutcome[] 
       };
     }
 
+    if (dealerPush22) {
+      return { handId: hand.id, result: "push", returnedCredits: hand.bet - hand.freeBetPortion };
+    }
+
     if (dealerValue.isBust) {
       return {
         handId: hand.id,
         result: "win",
-        returnedCredits: hand.bet * 2,
+        returnedCredits: hand.bet * 2 - hand.freeBetPortion,
       };
     }
 
@@ -250,10 +289,10 @@ export const resolveOutcomes = (round: RoundState, rules: Rules): HandOutcome[] 
       return {
         handId: hand.id,
         result: "win",
-        returnedCredits: hand.bet * 2,
+        returnedCredits: hand.bet * 2 - hand.freeBetPortion,
       };
     }
 
-    return { handId: hand.id, result: "push", returnedCredits: hand.bet };
+    return { handId: hand.id, result: "push", returnedCredits: hand.bet - hand.freeBetPortion };
   });
 };

@@ -5,6 +5,8 @@ export interface StrategyContext {
   dealerUpCard: Card;
   allowedActions: PlayerAction[];
   isSplitHand: boolean;
+  gameMode: "classic" | "freeBet";
+  isFreeBetHand: boolean;
 }
 
 export interface TrainingFeedback {

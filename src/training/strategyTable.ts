@@ -7,6 +7,8 @@ const upcardValue = (card: Card): number => {
   return Number(card.rank);
 };
 
+const isTenRank = (rank: Card["rank"]): boolean => rank === "10" || rank === "J" || rank === "Q" || rank === "K";
+
 const fallbackByAllowed = (allowed: PlayerAction[], preferred: PlayerAction): PlayerAction => {
   if (allowed.includes(preferred)) return preferred;
   if (preferred === "split" && allowed.includes("hit")) return "hit";
@@ -15,7 +17,7 @@ const fallbackByAllowed = (allowed: PlayerAction[], preferred: PlayerAction): Pl
   return allowed[0];
 };
 
-const splitDecision = (rank: string, dealer: number): PlayerAction => {
+const classicSplitDecision = (rank: Card["rank"], dealer: number): PlayerAction => {
   if (rank === "A" || rank === "8") return "split";
   if (rank === "10" || rank === "5") return "stand";
   if (rank === "9") return [2, 3, 4, 5, 6, 8, 9].includes(dealer) ? "split" : "stand";
@@ -26,7 +28,13 @@ const splitDecision = (rank: string, dealer: number): PlayerAction => {
   return "stand";
 };
 
-const softDecision = (total: number, dealer: number): PlayerAction => {
+const freeBetSplitDecision = (rank: Card["rank"]): PlayerAction => {
+  if (isTenRank(rank)) return "stand";
+  if (rank === "5") return "double";
+  return "split";
+};
+
+const classicSoftDecision = (total: number, dealer: number): PlayerAction => {
   if (total >= 20) return "stand";
   if (total === 19) return dealer === 6 ? "double" : "stand";
   if (total === 18) {
@@ -40,7 +48,33 @@ const softDecision = (total: number, dealer: number): PlayerAction => {
   return "hit";
 };
 
-const hardDecision = (total: number, dealer: number): PlayerAction => {
+const freeBetRealMoneySoftDecision = (total: number, dealer: number): PlayerAction => {
+  if (total >= 19) return "stand";
+  if (total === 18) {
+    if ([5, 6].includes(dealer)) return "double";
+    if ([2, 3, 4, 7, 8].includes(dealer)) return "stand";
+    return "hit"; // vs 9, 10, A
+  }
+  if (total === 17) return dealer >= 5 && dealer <= 6 ? "double" : "hit";
+  if (total === 16) return dealer === 6 ? "double" : "hit";
+  return "hit";
+};
+
+const freeBetFreeHandSoftDecision = (total: number, dealer: number): PlayerAction => {
+  if (total >= 21) return "stand";
+  if (total === 20) return dealer === 6 ? "double" : "stand";
+  if (total === 19) return dealer === 5 || dealer === 6 ? "double" : "stand";
+  if (total === 18) {
+    if ([4, 5, 6].includes(dealer)) return "double";
+    if (dealer === 7) return "stand";
+    return "hit";
+  }
+  if (total === 17) return dealer >= 4 && dealer <= 6 ? "double" : "hit";
+  if (total === 16) return dealer === 6 ? "double" : "hit";
+  return "hit";
+};
+
+const classicHardDecision = (total: number, dealer: number): PlayerAction => {
   if (total >= 17) return "stand";
   if (total >= 13 && total <= 16) return dealer >= 2 && dealer <= 6 ? "stand" : "hit";
   if (total === 12) return dealer >= 4 && dealer <= 6 ? "stand" : "hit";
@@ -50,10 +84,44 @@ const hardDecision = (total: number, dealer: number): PlayerAction => {
   return "hit";
 };
 
+const freeBetRealMoneyHardDecision = (total: number, dealer: number): PlayerAction => {
+  if (total >= 18) return "stand";
+  if (total === 17) {
+    // RS on dealer A, but surrender is unavailable, so use "stand".
+    return "stand";
+  }
+  if (total === 16) {
+    if (dealer >= 2 && dealer <= 6) return "stand";
+    // R on 9/10/A, but surrender is unavailable, so use "hit".
+    return "hit";
+  }
+  if (total === 15) {
+    if (dealer >= 2 && dealer <= 6) return "stand";
+    // R on 10/A, but surrender is unavailable, so use "hit".
+    return "hit";
+  }
+  if (total === 14) return dealer >= 2 && dealer <= 6 ? "stand" : "hit";
+  if (total === 13) return dealer >= 3 && dealer <= 6 ? "stand" : "hit";
+  if (total === 12) return dealer >= 5 && dealer <= 6 ? "stand" : "hit";
+  if (total >= 9 && total <= 11) return "double";
+  return "hit";
+};
+
+const freeBetFreeHandHardDecision = (total: number, dealer: number): PlayerAction => {
+  if (total >= 18) return "stand";
+  if (total >= 15 && total <= 17) return dealer >= 2 && dealer <= 6 ? "stand" : "hit";
+  if (total === 14 || total === 13) return dealer >= 3 && dealer <= 6 ? "stand" : "hit";
+  if (total === 12) return dealer >= 5 && dealer <= 6 ? "stand" : "hit";
+  if (total >= 9 && total <= 11) return "double";
+  return "hit";
+};
+
 export const recommendedActionFromBasicStrategy = (
   cards: Card[],
   dealerUpCard: Card,
   allowedActions: PlayerAction[],
+  gameMode: "classic" | "freeBet" = "classic",
+  isFreeBetHand = false,
 ): PlayerAction => {
   const dealer = upcardValue(dealerUpCard);
   const isPair = cards.length === 2 && cards[0].rank === cards[1].rank;
@@ -61,11 +129,24 @@ export const recommendedActionFromBasicStrategy = (
   // 5,5 and 10,10 are "never split" rows; play them as hard totals instead.
   const shouldUsePairTable = isPair && pairRank !== "5" && pairRank !== "10";
   if (allowedActions.includes("split") && shouldUsePairTable) {
-    const pref = splitDecision(cards[0].rank, dealer);
+    const pref = gameMode === "freeBet" ? freeBetSplitDecision(cards[0].rank) : classicSplitDecision(cards[0].rank, dealer);
     return fallbackByAllowed(allowedActions, pref);
   }
 
   const value = evaluateHand(cards);
-  const pref = value.isSoft ? softDecision(value.total, dealer) : hardDecision(value.total, dealer);
+  let pref: PlayerAction;
+  if (gameMode === "freeBet") {
+    if (value.isSoft) {
+      pref = isFreeBetHand
+        ? freeBetFreeHandSoftDecision(value.total, dealer)
+        : freeBetRealMoneySoftDecision(value.total, dealer);
+    } else {
+      pref = isFreeBetHand
+        ? freeBetFreeHandHardDecision(value.total, dealer)
+        : freeBetRealMoneyHardDecision(value.total, dealer);
+    }
+  } else {
+    pref = value.isSoft ? classicSoftDecision(value.total, dealer) : classicHardDecision(value.total, dealer);
+  }
   return fallbackByAllowed(allowedActions, pref);
 };

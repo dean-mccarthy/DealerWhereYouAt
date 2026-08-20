@@ -17,6 +17,8 @@ export const getTrainingFeedback = (
     context.playerCards,
     context.dealerUpCard,
     context.allowedActions,
+    context.gameMode,
+    context.isFreeBetHand,
   );
   const isCorrect = chosenAction === recommendedAction;
   const chosenLabel = actionLabel(chosenAction);

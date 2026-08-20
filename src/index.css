@@ -15,7 +15,36 @@ body {
 }
 
 .layout {
+  position: relative;
   display: block;
+}
+
+.coach-stats-panel {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 16px);
+  width: 180px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(200, 170, 110, 0.7);
+  background: rgba(5, 37, 19, 0.82);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+}
+
+.coach-stats-line {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.coach-stats-percent {
+  margin: 10px 0 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #f6dd7f;
+}
+
+.game-surface {
+  margin: 0 auto;
 }
 
 .table-title {
@@ -304,6 +333,31 @@ body {
   padding: 18px 20px 22px;
 }
 
+.game-surface.free-bet {
+  background: radial-gradient(circle at 50% 30%, #9f2e2e 0%, #651717 62%, #3a0d0d 100%);
+}
+
+.game-mode-toggle {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.mode-button {
+  min-width: 110px;
+  min-height: 38px;
+  padding: 8px 12px;
+  background: rgba(49, 10, 10, 0.88);
+  border: 1px solid rgba(231, 198, 136, 0.7);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.26);
+}
+
+.mode-button.active {
+  background: linear-gradient(180deg, #e0b25a 0%, #b98525 100%);
+  color: #2a1202;
+}
+
 .table-zone {
   margin: 0 auto;
   width: 100%;
@@ -378,6 +432,73 @@ body {
 .bet-dock p {
   text-align: left;
   margin: 4px 0 6px;
+}
+
+.wager-stack-area {
+  min-height: 92px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.wager-stack {
+  position: relative;
+  width: 58px;
+  height: 108px;
+}
+
+.wager-chip {
+  position: absolute;
+  left: 0;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 246, 210, 0.92);
+  background: radial-gradient(circle at 30% 30%, #de3d3d, #9b1212);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.32), inset 0 1px 4px rgba(255, 255, 255, 0.2);
+  color: #fff9ea;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+}
+
+.wager-chip.chip-red {
+  background: radial-gradient(circle at 30% 30%, #de3d3d, #9b1212);
+  color: #fff9ea;
+}
+
+.wager-chip.chip-blue {
+  background: radial-gradient(circle at 30% 30%, #3f7ce6, #214da6);
+  color: #eef4ff;
+}
+
+.wager-chip.chip-white {
+  background: radial-gradient(circle at 30% 30%, #f3f4f6, #7a7f89);
+  color: #1e2228;
+  border-color: rgba(40, 44, 53, 0.4);
+}
+
+.wager-chip.chip-green {
+  background: radial-gradient(circle at 30% 30%, #3ac477, #1f7a46);
+  color: #ecfff2;
+}
+
+.free-bet-chip {
+  position: static;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid rgba(161, 111, 25, 0.88);
+  background: radial-gradient(circle at 35% 25%, #ffe889, #d8a22e);
+  color: #402503;
+  font-size: 0.62rem;
+  line-height: 1.1;
+  box-shadow: 0 7px 14px rgba(0, 0, 0, 0.35), inset 0 1px 5px rgba(255, 255, 255, 0.35);
 }
 
 .deal-button {
@@ -483,13 +604,80 @@ body {
   margin-bottom: 4px;
 }
 
+.instant-popup-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: #f1f4da;
+  cursor: pointer;
+}
+
+.instant-popup-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: 0;
+}
+
+.instant-popup-slider {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(153, 42, 42, 0.9);
+  border: 1px solid rgba(231, 198, 136, 0.65);
+  transition: background 0.2s ease;
+}
+
+.instant-popup-slider::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff4db;
+  transition: transform 0.2s ease;
+}
+
+.instant-popup-input:checked + span + .instant-popup-slider {
+  background: rgba(40, 145, 78, 0.95);
+}
+
+.instant-popup-input:checked + span + .instant-popup-slider::before {
+  transform: translateX(16px);
+}
+
+.instant-popup-input:focus-visible + span + .instant-popup-slider {
+  outline: 2px solid #f6dd7f;
+  outline-offset: 2px;
+}
+
+.instant-popup-input:disabled + span + .instant-popup-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.instant-popup-toggle span:first-of-type {
+  user-select: none;
+}
+
+.instant-popup-toggle .instant-popup-slider {
+  margin: 0;
+}
+
 .training-panel-header h2 {
   margin: 0;
   font-size: 1.05rem;
 }
 
 .training-panel-header .training-toggle {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .training-toggle {
@@ -767,9 +955,19 @@ button:disabled {
 }
 
 @media (max-width: 800px) {
+  .layout {
+    display: block;
+  }
+
+  .coach-stats-panel {
+    position: static;
+    width: auto;
+    margin-top: 10px;
+  }
+
   .game-surface {
     min-height: 680px;
-    padding-top: 130px;
+    padding-top: 178px;
     padding-bottom: 170px;
   }
 

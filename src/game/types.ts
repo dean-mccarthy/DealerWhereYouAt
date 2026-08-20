@@ -26,6 +26,7 @@ export interface Rules {
   dealerHitsSoft17: boolean;
   blackjackPayout: number;
   doubleAfterSplit: boolean;
+  gameMode: "classic" | "freeBet";
   minBet: number;
   betStep: number;
 }
@@ -34,6 +35,7 @@ export interface HandState {
   id: string;
   cards: Card[];
   bet: number;
+  freeBetPortion: number;
   stood: boolean;
   doubled: boolean;
   isSplitHand: boolean;

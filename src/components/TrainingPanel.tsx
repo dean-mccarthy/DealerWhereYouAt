@@ -4,6 +4,8 @@ import type { TrainingFeedback } from "../training/types";
 interface TrainingPanelProps {
   trainingMode: boolean;
   onToggleTrainingMode: (enabled: boolean) => void;
+  instantPopupEnabled: boolean;
+  onToggleInstantPopup: (enabled: boolean) => void;
   currentRecommendation: PlayerAction | null;
   feedbackHistory: TrainingFeedback[];
 }
@@ -11,12 +13,25 @@ interface TrainingPanelProps {
 export const TrainingPanel = ({
   trainingMode,
   onToggleTrainingMode,
+  instantPopupEnabled,
+  onToggleInstantPopup,
   currentRecommendation,
   feedbackHistory,
 }: TrainingPanelProps) => (
   <section className="panel">
     <div className="training-panel-header">
       <h2>Strategy Coach</h2>
+      <label className="instant-popup-toggle">
+        <input
+          type="checkbox"
+          className="instant-popup-input"
+          checked={instantPopupEnabled}
+          onChange={(event) => onToggleInstantPopup(event.target.checked)}
+          aria-label="Toggle feedback popup"
+        />
+        <span>Feedback</span>
+        <span className="instant-popup-slider" aria-hidden="true" />
+      </label>
       <button
         type="button"
         className="training-toggle"

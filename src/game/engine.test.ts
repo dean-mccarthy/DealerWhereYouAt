@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { advanceDealerTurn, applyAction, resolveOutcomes, startRound } from "./engine";
-import { DEFAULT_RULES } from "./rules";
+import { advanceDealerTurn, applyAction, legalActions, resolveOutcomes, startRound } from "./engine";
+import { DEFAULT_RULES, FREE_BET_RULES } from "./rules";
 import type { Card, RoundState } from "./types";
 
 const c = (rank: Card["rank"], suit: Card["suit"] = "spades"): Card => ({ rank, suit });
@@ -19,6 +19,7 @@ describe("engine", () => {
           id: "h1",
           cards: [c("8"), c("8", "hearts")],
           bet: 25,
+          freeBetPortion: 0,
           stood: false,
           doubled: false,
           isSplitHand: false,
@@ -43,6 +44,7 @@ describe("engine", () => {
           id: "h1",
           cards: [c("10"), c("K", "hearts")],
           bet: 25,
+          freeBetPortion: 0,
           stood: false,
           doubled: false,
           isSplitHand: false,
@@ -67,6 +69,7 @@ describe("engine", () => {
           id: "h1",
           cards: [c("A"), c("K")],
           bet: 20,
+          freeBetPortion: 0,
           stood: true,
           doubled: false,
           isSplitHand: false,
@@ -98,6 +101,7 @@ describe("engine", () => {
           id: "h1",
           cards: [c("10"), c("7")],
           bet: 25,
+          freeBetPortion: 0,
           stood: false,
           doubled: false,
           isSplitHand: false,
@@ -120,6 +124,7 @@ describe("engine", () => {
           id: "h1",
           cards: [c("10"), c("7")],
           bet: 25,
+          freeBetPortion: 0,
           stood: true,
           doubled: false,
           isSplitHand: false,
@@ -136,5 +141,100 @@ describe("engine", () => {
 
     const finished = advanceDealerTurn(advanced.round, advanced.shoe, DEFAULT_RULES);
     expect(finished.round.phase).toBe("roundOver");
+  });
+
+  it("splits for free in free-bet mode", () => {
+    const round: RoundState = {
+      phase: "playerTurn",
+      playerHands: [
+        {
+          id: "h1",
+          cards: [c("8"), c("8", "hearts")],
+          bet: 25,
+          freeBetPortion: 0,
+          stood: false,
+          doubled: false,
+          isSplitHand: false,
+        },
+      ],
+      dealerHand: [c("6"), c("10")],
+      activeHandIndex: 0,
+      message: "",
+    };
+    const shoe = [c("2"), c("3"), c("9"), c("4")];
+    const applied = applyAction(round, shoe, "split", FREE_BET_RULES);
+    expect(applied.result.additionalWager).toBe(0);
+    expect(applied.result.feedbackMessage).toBe("You split for free");
+    expect(applied.result.round.playerHands[1].freeBetPortion).toBe(25);
+  });
+
+  it("pushes all hands when dealer has 22 in free-bet mode", () => {
+    const round: RoundState = {
+      phase: "roundOver",
+      playerHands: [
+        {
+          id: "h1",
+          cards: [c("10"), c("7")],
+          bet: 30,
+          freeBetPortion: 10,
+          stood: true,
+          doubled: true,
+          isSplitHand: false,
+        },
+      ],
+      dealerHand: [c("9"), c("7"), c("6")],
+      activeHandIndex: 0,
+      message: "",
+    };
+    const outcomes = resolveOutcomes(round, FREE_BET_RULES);
+    expect(outcomes[0]).toEqual({ handId: "h1", result: "push", returnedCredits: 20 });
+  });
+
+  it("allows non-free split in free-bet mode with normal wager", () => {
+    const round: RoundState = {
+      phase: "playerTurn",
+      playerHands: [
+        {
+          id: "h1",
+          cards: [c("10"), c("K", "hearts")],
+          bet: 25,
+          freeBetPortion: 0,
+          stood: false,
+          doubled: false,
+          isSplitHand: false,
+        },
+      ],
+      dealerHand: [c("6"), c("9")],
+      activeHandIndex: 0,
+      message: "",
+    };
+    expect(legalActions(round, FREE_BET_RULES)).toContain("split");
+    const applied = applyAction(round, [c("2"), c("3")], "split", FREE_BET_RULES);
+    expect(applied.result.additionalWager).toBe(25);
+    expect(applied.result.feedbackMessage).toBe("You split");
+  });
+
+  it("allows non-free double in free-bet mode with normal wager", () => {
+    const round: RoundState = {
+      phase: "playerTurn",
+      playerHands: [
+        {
+          id: "h1",
+          cards: [c("8"), c("8", "hearts")],
+          bet: 25,
+          freeBetPortion: 0,
+          stood: false,
+          doubled: false,
+          isSplitHand: false,
+        },
+      ],
+      dealerHand: [c("6"), c("9")],
+      activeHandIndex: 0,
+      message: "",
+    };
+    expect(legalActions(round, FREE_BET_RULES)).toContain("double");
+    const applied = applyAction(round, [c("2")], "double", FREE_BET_RULES);
+    expect(applied.result.additionalWager).toBe(25);
+    expect(applied.result.feedbackMessage).toBe("You doubled");
   });
 });

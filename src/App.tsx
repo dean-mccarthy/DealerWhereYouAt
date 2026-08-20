@@ -5,20 +5,22 @@ import { TableView } from "./components/TableView";
 import { TrainingPanel } from "./components/TrainingPanel";
 import { fetchCardImageMap } from "./game/deckApi";
 import { advanceDealerTurn, applyAction, legalActions, resolveOutcomes, startRound } from "./game/engine";
-import { DEFAULT_RULES } from "./game/rules";
+import { evaluateHand } from "./game/hand";
+import { cardNumericValue } from "./game/cards";
+import { DEFAULT_RULES, FREE_BET_RULES } from "./game/rules";
 import { createShoe, draw } from "./game/shoe";
-import type { Card, PlayerAction, RoundState } from "./game/types";
+import type { Card, PlayerAction, RoundState, Rules } from "./game/types";
 import { recommendedActionFromBasicStrategy } from "./training/strategyTable";
 import { getTrainingFeedback } from "./training/advisor";
 import type { TrainingFeedback } from "./training/types";
 
 const STARTING_CREDITS = 1000;
 const SHOE_RESHUFFLE_PENETRATION = 0.5;
-const INITIAL_SHOE_SIZE = DEFAULT_RULES.deckCount * 52;
+const getShoeSize = (rules: Rules) => rules.deckCount * 52;
 
-const ensureShoe = (shoe: Card[]): Card[] =>
-  shoe.length <= Math.floor(INITIAL_SHOE_SIZE * SHOE_RESHUFFLE_PENETRATION)
-    ? createShoe(DEFAULT_RULES.deckCount)
+const ensureShoe = (shoe: Card[], rules: Rules): Card[] =>
+  shoe.length <= Math.floor(getShoeSize(rules) * SHOE_RESHUFFLE_PENETRATION)
+    ? createShoe(rules.deckCount)
     : shoe;
 const DEALER_REVEAL_DELAY_MS = 900;
 const DEALER_STEP_DELAY_MS = 1000;
@@ -39,13 +41,19 @@ const DRAW_ANIMATION_MS = DRAW_CARD_ANIMATION_MS + DRAW_ANIMATION_BUFFER_MS;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function App() {
+  const [gameMode, setGameMode] = useState<"classic" | "freeBet">("classic");
+  const activeRules = useMemo(() => (gameMode === "freeBet" ? FREE_BET_RULES : DEFAULT_RULES), [gameMode]);
+  const initialShoeSize = useMemo(() => getShoeSize(activeRules), [activeRules]);
   const [credits, setCredits] = useState(STARTING_CREDITS);
   const [bet, setBet] = useState(0);
-  const [shoe, setShoe] = useState<Card[]>(() => createShoe(DEFAULT_RULES.deckCount));
+  const [shoe, setShoe] = useState<Card[]>(() => createShoe(activeRules.deckCount));
   const [round, setRound] = useState<RoundState | null>(null);
   const [message, setMessage] = useState("Welcome to Blackjack Trainer.");
   const [trainingMode, setTrainingMode] = useState(true);
+  const [instantPopupEnabled, setInstantPopupEnabled] = useState(true);
   const [feedbackHistory, setFeedbackHistory] = useState<TrainingFeedback[]>([]);
+  const [totalMoves, setTotalMoves] = useState(0);
+  const [correctMoves, setCorrectMoves] = useState(0);
   const [lastRecommendation, setLastRecommendation] = useState<PlayerAction | null>(null);
   const [cardImageMap, setCardImageMap] = useState<Record<string, string>>({});
   const [splitAnimating, setSplitAnimating] = useState(false);
@@ -99,22 +107,33 @@ function App() {
   );
 
   const currentLegalActions = useMemo(
-    () => (round ? legalActions(round, DEFAULT_RULES) : []),
-    [round],
+    () => (round ? legalActions(round, activeRules) : []),
+    [activeRules, round],
   );
   const cannotAffordDouble = useMemo(() => {
     if (!round || round.phase !== "playerTurn") return false;
     const activeHand = round.playerHands[round.activeHandIndex];
+    if (activeRules.gameMode === "freeBet") {
+      const value = evaluateHand(activeHand.cards);
+      const isFreeDoubleWindow = activeHand.cards.length === 2 && !value.isSoft && value.total >= 9 && value.total <= 11;
+      if (isFreeDoubleWindow) return false;
+    }
     return activeHand.bet > credits;
-  }, [credits, round]);
-  const dealDisabled =
-    (round !== null && round.phase !== "roundOver") || bet < DEFAULT_RULES.minBet || splitAnimating;
+  }, [activeRules.gameMode, credits, round]);
+  const dealDisabled = (round !== null && round.phase !== "roundOver") || bet < activeRules.minBet || splitAnimating;
+  const accuracyPercent = totalMoves > 0 ? Math.round((correctMoves / totalMoves) * 100) : 0;
 
   const recommendation = useMemo(() => {
     if (!round || round.phase !== "playerTurn") return null;
     const hand = round.playerHands[round.activeHandIndex];
-    return recommendedActionFromBasicStrategy(hand.cards, round.dealerHand[0], currentLegalActions);
-  }, [currentLegalActions, round]);
+    return recommendedActionFromBasicStrategy(
+      hand.cards,
+      round.dealerHand[0],
+      currentLegalActions,
+      activeRules.gameMode,
+      hand.freeBetPortion > 0,
+    );
+  }, [activeRules.gameMode, currentLegalActions, round]);
 
   useEffect(() => {
     if (recommendation) setLastRecommendation(recommendation);
@@ -156,7 +175,7 @@ function App() {
 
       while (!cancelled && animatedRound.phase === "dealerTurn") {
         const dealerCardCountBefore = animatedRound.dealerHand.length;
-        const advanced = advanceDealerTurn(animatedRound, animatedShoe, DEFAULT_RULES);
+        const advanced = advanceDealerTurn(animatedRound, animatedShoe, activeRules);
         animatedRound = advanced.round;
         animatedShoe = advanced.shoe;
         if (animatedRound.dealerHand.length > dealerCardCountBefore) {
@@ -167,7 +186,7 @@ function App() {
         setShoe(animatedShoe);
 
         if (animatedRound.phase === "roundOver") {
-          const outcomes = resolveOutcomes(animatedRound, DEFAULT_RULES);
+          const outcomes = resolveOutcomes(animatedRound, activeRules);
           const returnedCredits = outcomes.reduce((sum, entry) => sum + entry.returnedCredits, 0);
           setCredits((value) => value + returnedCredits);
           const outcomeText = outcomes
@@ -188,13 +207,13 @@ function App() {
       cancelled = true;
       dealerAnimationRunningRef.current = false;
     };
-  }, [round?.phase]);
+  }, [activeRules, round?.phase, shoe]);
 
   const validateBet = (candidateBet: number): string | null => {
     if (!Number.isFinite(candidateBet)) return "Enter a valid bet.";
-    if (candidateBet < DEFAULT_RULES.minBet) return `Minimum bet is ${DEFAULT_RULES.minBet}.`;
-    if (candidateBet % DEFAULT_RULES.betStep !== 0) {
-      return `Bet must be in increments of ${DEFAULT_RULES.betStep}.`;
+    if (candidateBet < activeRules.minBet) return `Minimum bet is ${activeRules.minBet}.`;
+    if (candidateBet % activeRules.betStep !== 0) {
+      return `Bet must be in increments of ${activeRules.betStep}.`;
     }
     if (candidateBet > credits) return "Not enough credits.";
     return null;
@@ -234,7 +253,7 @@ function App() {
       setMessage(validationError);
       return;
     }
-    const replenishedShoe = ensureShoe(shoe);
+    const replenishedShoe = ensureShoe(shoe, activeRules);
     const didReshuffle = replenishedShoe !== shoe;
     if (didReshuffle) {
       setIsShuffling(true);
@@ -245,7 +264,7 @@ function App() {
     }
     const started = startRound(replenishedShoe, bet);
     const startedRoundOutcomes =
-      started.round.phase === "roundOver" ? resolveOutcomes(started.round, DEFAULT_RULES) : null;
+      started.round.phase === "roundOver" ? resolveOutcomes(started.round, activeRules) : null;
     const immediateReturnedCredits =
       startedRoundOutcomes?.reduce((sum, entry) => sum + entry.returnedCredits, 0) ?? 0;
     setShoe(started.shoe);
@@ -276,26 +295,39 @@ function App() {
         dealerUpCard: round.dealerHand[0],
         allowedActions: currentLegalActions,
         isSplitHand: hand.isSplitHand,
+        gameMode: activeRules.gameMode,
+        isFreeBetHand: hand.freeBetPortion > 0,
       },
       action,
     );
     setFeedbackHistory((value) => [...value, feedback]);
-    showMoveResultIndicator(feedback.isCorrect);
+    setTotalMoves((value) => value + 1);
+    if (feedback.isCorrect) {
+      setCorrectMoves((value) => value + 1);
+    }
+    if (instantPopupEnabled) {
+      showMoveResultIndicator(feedback.isCorrect);
+    }
 
     if (action === "split") {
       const runSplitAnimation = async () => {
         const originalHand = round.playerHands[round.activeHandIndex];
         if (!originalHand) return;
-        if (originalHand.bet > credits) {
+        const [leftCard, rightCard] = originalHand.cards;
+        if (!leftCard || !rightCard) return;
+        const isFreeBetSplit =
+          activeRules.gameMode === "freeBet" &&
+          leftCard.rank === rightCard.rank &&
+          cardNumericValue(leftCard) !== 10;
+        if (!isFreeBetSplit && originalHand.bet > credits) {
           setMessage("Not enough credits for that action.");
           return;
         }
 
-        const [leftCard, rightCard] = originalHand.cards;
-        if (!leftCard || !rightCard) return;
-
         setSplitAnimating(true);
-        setCredits((value) => value - originalHand.bet);
+        if (!isFreeBetSplit) {
+          setCredits((value) => value - originalHand.bet);
+        }
 
         const splitRound: RoundState = {
           ...round,
@@ -308,6 +340,7 @@ function App() {
               id: `${currentHand.id}-left`,
               cards: [leftCard],
               bet: currentHand.bet,
+              freeBetPortion: currentHand.freeBetPortion,
               stood: false,
               doubled: false,
               isSplitHand: true,
@@ -319,13 +352,14 @@ function App() {
           id: `${originalHand.id}-right`,
           cards: [rightCard],
           bet: originalHand.bet,
+          freeBetPortion: isFreeBetSplit ? originalHand.bet : 0,
           stood: false,
           doubled: false,
           isSplitHand: true,
         });
 
         setRound(splitRound);
-        setMessage("You split");
+        setMessage(isFreeBetSplit ? "You split for free" : "You split");
         await pause(SPLIT_STEP_DELAY_MS);
 
         let nextShoe = shoe;
@@ -368,7 +402,7 @@ function App() {
       return;
     }
 
-    const applied = applyAction(round, shoe, action, DEFAULT_RULES);
+    const applied = applyAction(round, shoe, action, activeRules);
     if (applied.result.additionalWager > credits) {
       setMessage("Not enough credits for that action.");
       return;
@@ -400,7 +434,7 @@ function App() {
   return (
     <main className="app">
       <div className="layout">
-        <div className="game-surface">
+        <div className={gameMode === "freeBet" ? "game-surface free-bet" : "game-surface"}>
           <p className="table-message">{message}</p>
           <p className="credits-hud">Credits: {credits}</p>
           <div className={isShuffling ? "shoe-stack shuffling" : "shoe-stack"} aria-hidden="true">
@@ -424,13 +458,33 @@ function App() {
               A♠
             </span>
             <span>
-              {shoe.length}/{INITIAL_SHOE_SIZE}
+              {shoe.length}/{initialShoeSize}
             </span>
           </div>
           <div className="training-overlay">
+            <div className="game-mode-toggle" role="group" aria-label="Game mode">
+              <button
+                type="button"
+                className={gameMode === "classic" ? "mode-button active" : "mode-button"}
+                onClick={() => setGameMode("classic")}
+                disabled={round !== null && round.phase !== "roundOver"}
+              >
+                Classic
+              </button>
+              <button
+                type="button"
+                className={gameMode === "freeBet" ? "mode-button active" : "mode-button"}
+                onClick={() => setGameMode("freeBet")}
+                disabled={round !== null && round.phase !== "roundOver"}
+              >
+                Free Bet
+              </button>
+            </div>
             <TrainingPanel
               trainingMode={trainingMode}
               onToggleTrainingMode={setTrainingMode}
+              instantPopupEnabled={instantPopupEnabled}
+              onToggleInstantPopup={setInstantPopupEnabled}
               currentRecommendation={recommendation ?? lastRecommendation}
               feedbackHistory={feedbackHistory}
             />
@@ -439,6 +493,7 @@ function App() {
           <div className="table-zone">
             <TableView
               round={round}
+              gameMode={gameMode}
               cardImageMap={cardImageMap}
               dealAnimationActive={dealAnimationActive}
               dealAnimationTick={dealAnimationTick}
@@ -477,9 +532,15 @@ function App() {
               bet={bet}
               onBetChange={setBet}
               disabled={round !== null && round.phase !== "roundOver"}
+              round={round}
             />
           </div>
         </div>
+        <aside className="coach-stats-panel" aria-label="Training accuracy stats">
+          <p className="coach-stats-line">Moves: {totalMoves}</p>
+          <p className="coach-stats-line">Correct: {correctMoves}</p>
+          <p className="coach-stats-percent">Accuracy: {accuracyPercent}%</p>
+        </aside>
       </div>
     </main>
   );
