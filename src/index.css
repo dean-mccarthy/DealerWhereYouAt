@@ -70,257 +70,45 @@ body {
   color: #f4f5dc;
 }
 
-.card-counter-hud {
+.side-bet-odds-hud {
   position: absolute;
+  top: 42px;
   left: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: rgba(6, 36, 19, 0.72);
-  border: 1px solid rgba(200, 170, 110, 0.7);
-  font-weight: 700;
-  color: #f1f4da;
-}
-
-.shoe-stack {
-  position: absolute;
-  left: 24px;
-  top: calc(50% - 140px);
-  width: 110px;
-  height: 113px;
+  margin: 0;
+  padding: 0 4px 0 0;
+  opacity: 0.55;
+  color: #eef6e3;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28);
+  letter-spacing: 0.02em;
   pointer-events: none;
 }
 
-.shoe-stack.shuffling {
-  animation: shoe-shuffle-sweep 1300ms cubic-bezier(0.22, 0.61, 0.36, 1);
-  z-index: 4;
-}
-
-.shoe-stack-card {
-  position: absolute;
-  width: 78px;
-  height: 113px;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-  object-fit: cover;
-}
-
-.shoe-stack-card-1 {
-  left: 0;
-  top: 10px;
-  transform: rotate(-12deg);
-}
-
-.shoe-stack-card-2 {
-  left: 8px;
-  top: 7px;
-  transform: rotate(-6deg);
-}
-
-.shoe-stack-card-3 {
-  left: 16px;
-  top: 4px;
-  transform: rotate(0deg);
-}
-
-.shoe-stack-card-4 {
-  left: 24px;
-  top: 1px;
-  transform: rotate(6deg);
-}
-
-.shoe-stack-card-5 {
-  left: 32px;
-  top: -2px;
-  transform: rotate(12deg);
-}
-
-.shoe-stack-fallback {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.side-bet-odds-title {
+  margin: 0 0 2px;
+  line-height: 1.2;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: #f6f6f6;
-  background: linear-gradient(135deg, #1f4a7a 0%, #143659 100%);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
 }
 
-@keyframes shoe-shuffle-sweep {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-  35% {
-    transform: translate3d(170px, -24px, 0) rotate(6deg);
-  }
-  70% {
-    transform: translate3d(240px, -16px, 0) rotate(3deg);
-  }
-  85% {
-    transform: translate3d(205px, -10px, 0) rotate(2deg);
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
+.side-bet-odds-table {
+  border-collapse: collapse;
 }
 
-.shoe-stack.shuffling .shoe-stack-card-1 {
-  animation: shuffle-card-1 1300ms cubic-bezier(0.22, 0.61, 0.36, 1);
+.side-bet-odds-table td {
+  padding: 0;
+  line-height: 1.2;
+  font-size: 0.74rem;
+  font-weight: 600;
 }
 
-.shoe-stack.shuffling .shoe-stack-card-2 {
-  animation: shuffle-card-2 1300ms cubic-bezier(0.22, 0.61, 0.36, 1);
+.side-bet-odds-table td:first-child {
+  padding-right: 10px;
 }
 
-.shoe-stack.shuffling .shoe-stack-card-3 {
-  animation: shuffle-card-3 1300ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.shoe-stack.shuffling .shoe-stack-card-4 {
-  animation: shuffle-card-4 1300ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.shoe-stack.shuffling .shoe-stack-card-5 {
-  animation: shuffle-card-5 1300ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-@keyframes shuffle-card-1 {
-  0%,
-  100% {
-    left: 0;
-    top: 10px;
-    transform: rotate(-12deg);
-  }
-  22% {
-    left: -34px;
-    top: -18px;
-    transform: rotate(-34deg);
-  }
-  48% {
-    left: 16px;
-    top: 22px;
-    transform: rotate(6deg);
-  }
-  76% {
-    left: -18px;
-    top: 20px;
-    transform: rotate(-18deg);
-  }
-}
-
-@keyframes shuffle-card-2 {
-  0%,
-  100% {
-    left: 8px;
-    top: 7px;
-    transform: rotate(-6deg);
-  }
-  18% {
-    left: 42px;
-    top: -20px;
-    transform: rotate(18deg);
-  }
-  52% {
-    left: -10px;
-    top: 24px;
-    transform: rotate(-22deg);
-  }
-  78% {
-    left: 28px;
-    top: 16px;
-    transform: rotate(4deg);
-  }
-}
-
-@keyframes shuffle-card-3 {
-  0%,
-  100% {
-    left: 16px;
-    top: 4px;
-    transform: rotate(0deg);
-  }
-  25% {
-    left: 58px;
-    top: -24px;
-    transform: rotate(22deg);
-  }
-  50% {
-    left: -20px;
-    top: 20px;
-    transform: rotate(-24deg);
-  }
-  80% {
-    left: 36px;
-    top: 18px;
-    transform: rotate(10deg);
-  }
-}
-
-@keyframes shuffle-card-4 {
-  0%,
-  100% {
-    left: 24px;
-    top: 1px;
-    transform: rotate(6deg);
-  }
-  20% {
-    left: -18px;
-    top: -22px;
-    transform: rotate(-26deg);
-  }
-  56% {
-    left: 52px;
-    top: 22px;
-    transform: rotate(24deg);
-  }
-  82% {
-    left: 12px;
-    top: 17px;
-    transform: rotate(-8deg);
-  }
-}
-
-@keyframes shuffle-card-5 {
-  0%,
-  100% {
-    left: 32px;
-    top: -2px;
-    transform: rotate(12deg);
-  }
-  24% {
-    left: 70px;
-    top: -28px;
-    transform: rotate(34deg);
-  }
-  54% {
-    left: 4px;
-    top: 26px;
-    transform: rotate(-20deg);
-  }
-  84% {
-    left: 44px;
-    top: 14px;
-    transform: rotate(12deg);
-  }
-}
-
-.card-counter-icon {
-  width: 24px;
-  height: 30px;
-  border-radius: 4px;
-  background: #fbfbf7;
-  border: 1px solid #d1d5c8;
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.28);
-  color: #1a1a1a;
-  font-size: 0.62rem;
-  font-weight: 800;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.side-bet-odds-table td:last-child {
+  width: 36px;
+  text-align: right;
 }
 
 .game-surface {
@@ -438,8 +226,29 @@ body {
   min-height: 92px;
   margin-bottom: 8px;
   display: flex;
+  justify-content: flex-start;
   align-items: flex-end;
   gap: 10px;
+}
+
+.wager-stack-lane {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.wager-stack-main-lane {
+  justify-content: flex-start;
+}
+
+.wager-stack-side-lane {
+  flex-direction: row;
+  align-items: flex-end;
+  margin-left: 58px;
+}
+
+.wager-stack-placeholder {
+  opacity: 0;
 }
 
 .wager-stack {
@@ -948,6 +757,12 @@ button:disabled {
   color: #ffb0b0;
 }
 
+.side-bet-lost {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  opacity: 0.8;
+}
+
 .checkbox {
   display: flex;
   gap: 8px;
@@ -978,19 +793,8 @@ button:disabled {
     width: auto;
   }
 
-  .card-counter-hud {
-    top: 86px;
-    left: 10px;
-    transform: none;
-  }
-
   .training-overlay .round-indicator {
     text-align: left;
-  }
-
-  .shoe-stack {
-    top: 10px;
-    left: 10px;
   }
 
   .player-hands {

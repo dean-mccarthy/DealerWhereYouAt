@@ -21,8 +21,12 @@ export const evaluateHand = (cards: Card[]): HandValue => {
   };
 };
 
+export const isSplitAceHand = (hand: HandState): boolean =>
+  hand.isSplitHand && hand.cards[0]?.rank === "A";
+
 export const canSplit = (hand: HandState): boolean => {
   if (hand.cards.length !== 2) return false;
+  if (isSplitAceHand(hand)) return false;
   const [firstCard, secondCard] = hand.cards;
   if (firstCard.rank === secondCard.rank) return true;
   return cardNumericValue(firstCard) === 10 && cardNumericValue(secondCard) === 10;

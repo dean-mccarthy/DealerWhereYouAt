@@ -33,6 +33,63 @@ describe("engine", () => {
     const applied = applyAction(round, shoe, "split", DEFAULT_RULES);
     expect(applied.result.additionalWager).toBe(25);
     expect(applied.result.round.playerHands).toHaveLength(2);
+    expect(applied.result.round.playerHands[0].stood).toBe(false);
+    expect(applied.result.round.playerHands[1].stood).toBe(false);
+    expect(applied.result.round.phase).toBe("playerTurn");
+  });
+
+  it("deals one card each and stands after splitting aces", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const round: RoundState = {
+      phase: "playerTurn",
+      playerHands: [
+        {
+          id: "h1",
+          cards: [c("A"), c("A", "hearts")],
+          bet: 25,
+          freeBetPortion: 0,
+          stood: false,
+          doubled: false,
+          isSplitHand: false,
+        },
+      ],
+      dealerHand: [c("6"), c("10")],
+      activeHandIndex: 0,
+      message: "",
+    };
+    const shoe = [c("5"), c("K"), c("9"), c("4")];
+    const applied = applyAction(round, shoe, "split", DEFAULT_RULES);
+    expect(applied.result.round.playerHands).toHaveLength(2);
+    expect(applied.result.round.playerHands[0].cards).toHaveLength(2);
+    expect(applied.result.round.playerHands[1].cards).toHaveLength(2);
+    expect(applied.result.round.playerHands[0].stood).toBe(true);
+    expect(applied.result.round.playerHands[1].stood).toBe(true);
+    expect(applied.result.round.phase).toBe("dealerTurn");
+    expect(legalActions(applied.result.round, DEFAULT_RULES)).toEqual([]);
+  });
+
+  it("rejects hitting a split ace hand", () => {
+    const round: RoundState = {
+      phase: "playerTurn",
+      playerHands: [
+        {
+          id: "h1",
+          cards: [c("A"), c("5")],
+          bet: 25,
+          freeBetPortion: 0,
+          stood: false,
+          doubled: false,
+          isSplitHand: true,
+        },
+      ],
+      dealerHand: [c("6"), c("10")],
+      activeHandIndex: 0,
+      message: "",
+    };
+    expect(legalActions(round, DEFAULT_RULES)).toEqual([]);
+    const applied = applyAction(round, [c("9")], "hit", DEFAULT_RULES);
+    expect(applied.result.feedbackMessage).toBe("Action not allowed on this hand");
+    expect(applied.result.round.playerHands[0].cards).toHaveLength(2);
   });
 
   it("allows split on mixed ten-value cards", () => {

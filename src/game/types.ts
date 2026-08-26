@@ -47,6 +47,9 @@ export interface RoundState {
   dealerHand: Card[];
   activeHandIndex: number;
   message: string;
+  sideBetWager?: number;
+  potOfGoldLammers?: number;
+  sideBetSeedCards?: Card[];
 }
 
 export interface HandValue {

@@ -1,7 +1,7 @@
 import type { Rules } from "./types";
 
 export const DEFAULT_RULES: Rules = {
-  deckCount: 2,
+  deckCount: 6,
   dealerHitsSoft17: false,
   blackjackPayout: 1.5,
   doubleAfterSplit: true,
@@ -11,7 +11,7 @@ export const DEFAULT_RULES: Rules = {
 };
 
 export const FREE_BET_RULES: Rules = {
-  deckCount: 2,
+  deckCount: 6,
   dealerHitsSoft17: false,
   blackjackPayout: 1.5,
   doubleAfterSplit: true,

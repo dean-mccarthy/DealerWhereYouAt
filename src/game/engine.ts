@@ -1,4 +1,4 @@
-import { evaluateHand, canSplit } from "./hand";
+import { evaluateHand, canSplit, isSplitAceHand } from "./hand";
 import { cardNumericValue } from "./cards";
 import { draw } from "./shoe";
 import type {
@@ -49,7 +49,7 @@ export const legalActions = (round: RoundState, rules: Rules): PlayerAction[] =>
   if (round.phase !== "playerTurn") return [];
   const hand = round.playerHands[round.activeHandIndex];
   const value = evaluateHand(hand.cards);
-  if (value.isBust || hand.stood) return [];
+  if (value.isBust || hand.stood || isSplitAceHand(hand)) return [];
 
   const actions: PlayerAction[] = ["hit", "stand"];
   const canAttemptDouble = hand.cards.length === 2 && (!hand.isSplitHand || rules.doubleAfterSplit);
@@ -65,6 +65,7 @@ export const legalActions = (round: RoundState, rules: Rules): PlayerAction[] =>
 export const startRound = (
   shoe: Card[],
   bet: number,
+  sideBetWager = 0,
 ): { round: RoundState; shoe: Card[] } => {
   let nextShoe = shoe;
   const first = draw(nextShoe);
@@ -92,6 +93,9 @@ export const startRound = (
     dealerHand: [dealerOne.card, dealerTwo.card],
     activeHandIndex: 0,
     message: "Choose an action",
+    sideBetWager,
+    potOfGoldLammers: 0,
+    sideBetSeedCards: [first.card, second.card],
   };
 
   if (evaluateHand(round.dealerHand).isBlackjack) {
@@ -102,7 +106,7 @@ export const startRound = (
   return { round, shoe: nextShoe };
 };
 
-const settleIfDone = (
+export const settleIfDone = (
   round: RoundState,
   shoe: Card[],
   rules: Rules,
@@ -189,6 +193,7 @@ export const applyAction = (
     hand.bet *= 2;
     if (freeBetDoubleAllowed) {
       hand.freeBetPortion += doubleAmount;
+      next.potOfGoldLammers = (next.potOfGoldLammers ?? 0) + 1;
       additionalWager = 0;
       feedbackMessage = "You doubled for free";
     } else {
@@ -205,12 +210,13 @@ export const applyAction = (
     const rightDeal = draw(nextShoe);
     nextShoe = rightDeal.shoe;
     const originalBet = hand.bet;
+    const splitAces = leftCard.rank === "A";
     const left: HandState = {
       id: nextHandId(),
       cards: [leftCard, leftDeal.card],
       bet: originalBet,
       freeBetPortion: 0,
-      stood: false,
+      stood: splitAces,
       doubled: false,
       isSplitHand: true,
     };
@@ -219,12 +225,13 @@ export const applyAction = (
       cards: [rightCard, rightDeal.card],
       bet: originalBet,
       freeBetPortion: freeSplitAllowed ? originalBet : 0,
-      stood: false,
+      stood: splitAces,
       doubled: false,
       isSplitHand: true,
     };
     next.playerHands.splice(next.activeHandIndex, 1, left, right);
     if (freeSplitAllowed) {
+      next.potOfGoldLammers = (next.potOfGoldLammers ?? 0) + 1;
       additionalWager = 0;
       feedbackMessage = "You split for free";
     } else {

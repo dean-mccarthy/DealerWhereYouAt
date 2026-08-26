@@ -4,11 +4,12 @@ import { BetControls } from "./components/BetControls";
 import { TableView } from "./components/TableView";
 import { TrainingPanel } from "./components/TrainingPanel";
 import { fetchCardImageMap } from "./game/deckApi";
-import { advanceDealerTurn, applyAction, legalActions, resolveOutcomes, startRound } from "./game/engine";
+import { advanceDealerTurn, applyAction, legalActions, resolveOutcomes, settleIfDone, startRound } from "./game/engine";
 import { evaluateHand } from "./game/hand";
 import { cardNumericValue } from "./game/cards";
 import { DEFAULT_RULES, FREE_BET_RULES } from "./game/rules";
 import { createShoe, draw } from "./game/shoe";
+import { resolvePairSideBet, resolvePotOfGoldSideBet, type SideBetOutcome } from "./game/sideBet";
 import type { Card, PlayerAction, RoundState, Rules } from "./game/types";
 import { recommendedActionFromBasicStrategy } from "./training/strategyTable";
 import { getTrainingFeedback } from "./training/advisor";
@@ -25,7 +26,6 @@ const ensureShoe = (shoe: Card[], rules: Rules): Card[] =>
 const DEALER_REVEAL_DELAY_MS = 900;
 const DEALER_STEP_DELAY_MS = 1000;
 const SPLIT_STEP_DELAY_MS = 620;
-const SHUFFLE_ANIMATION_MS = 1300;
 const INITIAL_DEAL_CARD_ANIMATION_MS = 520;
 const DRAW_CARD_ANIMATION_MS = 360;
 const DRAW_ANIMATION_BUFFER_MS = 70;
@@ -43,12 +43,14 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 function App() {
   const [gameMode, setGameMode] = useState<"classic" | "freeBet">("classic");
   const activeRules = useMemo(() => (gameMode === "freeBet" ? FREE_BET_RULES : DEFAULT_RULES), [gameMode]);
-  const initialShoeSize = useMemo(() => getShoeSize(activeRules), [activeRules]);
+  const sideBetTitle = gameMode === "freeBet" ? "Pot of Gold" : "Perfect Pair";
   const [credits, setCredits] = useState(STARTING_CREDITS);
   const [bet, setBet] = useState(0);
+  const [sideBet, setSideBet] = useState(0);
   const [shoe, setShoe] = useState<Card[]>(() => createShoe(activeRules.deckCount));
   const [round, setRound] = useState<RoundState | null>(null);
   const [message, setMessage] = useState("Welcome to Blackjack Trainer.");
+  const [currentRoundSideBetWon, setCurrentRoundSideBetWon] = useState<boolean | null>(null);
   const [trainingMode, setTrainingMode] = useState(true);
   const [instantPopupEnabled, setInstantPopupEnabled] = useState(true);
   const [feedbackHistory, setFeedbackHistory] = useState<TrainingFeedback[]>([]);
@@ -57,7 +59,6 @@ function App() {
   const [lastRecommendation, setLastRecommendation] = useState<PlayerAction | null>(null);
   const [cardImageMap, setCardImageMap] = useState<Record<string, string>>({});
   const [splitAnimating, setSplitAnimating] = useState(false);
-  const [isShuffling, setIsShuffling] = useState(false);
   const [dealAnimationActive, setDealAnimationActive] = useState(false);
   const [dealAnimationTick, setDealAnimationTick] = useState(0);
   const [dealAnimationTargets, setDealAnimationTargets] = useState<string[] | null>(null);
@@ -71,7 +72,6 @@ function App() {
   const dealerAnimationRunningRef = useRef(false);
   const dealerRevealDelayMsRef = useRef(DEALER_REVEAL_DELAY_MS);
   const holeRevealStartDelayMsRef = useRef(HOLE_REVEAL_START_DELAY_MS);
-  const shuffleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holeRevealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holeRevealStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,7 +97,6 @@ function App() {
 
   useEffect(
     () => () => {
-      if (shuffleTimeoutRef.current) clearTimeout(shuffleTimeoutRef.current);
       if (dealTimeoutRef.current) clearTimeout(dealTimeoutRef.current);
       if (holeRevealTimeoutRef.current) clearTimeout(holeRevealTimeoutRef.current);
       if (holeRevealStartTimeoutRef.current) clearTimeout(holeRevealStartTimeoutRef.current);
@@ -187,12 +186,22 @@ function App() {
 
         if (animatedRound.phase === "roundOver") {
           const outcomes = resolveOutcomes(animatedRound, activeRules);
+          const sideBetOutcome = activeRules.gameMode === "freeBet" ? resolveCurrentSideBet(animatedRound) : null;
           const returnedCredits = outcomes.reduce((sum, entry) => sum + entry.returnedCredits, 0);
-          setCredits((value) => value + returnedCredits);
+          const sideBetReturnedCredits = sideBetOutcome?.returnedCredits ?? 0;
+          setCredits((value) => value + returnedCredits + sideBetReturnedCredits);
+          if (sideBetOutcome) {
+            setCurrentRoundSideBetWon(sideBetOutcome.won);
+          }
           const outcomeText = outcomes
             .map((entry, index) => `Hand ${index + 1}: ${entry.result} (+${entry.returnedCredits})`)
             .join(" | ");
-          setMessage(`Round complete. ${outcomeText}`);
+          const sideBetSummary = sideBetOutcome
+            ? sideBetOutcome.won
+              ? `${sideBetOutcome.name}: ${sideBetOutcome.payoutLabel} (+${sideBetOutcome.returnedCredits})`
+              : `${sideBetOutcome.name}: ${sideBetOutcome.payoutLabel} (+0)`
+            : null;
+          setMessage(sideBetSummary ? `Round complete. ${outcomeText} | ${sideBetSummary}` : `Round complete. ${outcomeText}`);
           break;
         }
 
@@ -219,6 +228,31 @@ function App() {
     return null;
   };
 
+  const validateSideBet = (candidateSideBet: number, candidateBet: number): string | null => {
+    if (!Number.isFinite(candidateSideBet) || candidateSideBet < 0) return "Enter a valid side bet.";
+    if (candidateSideBet % activeRules.betStep !== 0) {
+      return `Side bet must be in increments of ${activeRules.betStep}.`;
+    }
+    if (candidateSideBet > candidateBet) return "Side bet cannot exceed main bet.";
+    if (candidateBet + candidateSideBet > credits) return "Not enough credits for both bets.";
+    return null;
+  };
+
+  const handleBetChange = (candidateBet: number) => {
+    const clampedBet = Math.max(0, candidateBet);
+    if (clampedBet + sideBet > credits) return;
+    setBet(clampedBet);
+    if (sideBet > clampedBet) {
+      setSideBet(clampedBet);
+    }
+  };
+
+  const handleSideBetChange = (candidateSideBet: number) => {
+    const nextSideBet = Math.max(0, candidateSideBet);
+    if (validateSideBet(nextSideBet, bet)) return;
+    setSideBet(nextSideBet);
+  };
+
   const triggerDealAnimation = (
     targets: string[] | null,
     durationMs: number,
@@ -243,6 +277,33 @@ function App() {
     }, MOVE_RESULT_POPUP_MS);
   };
 
+  const resolveCurrentSideBet = (roundState: RoundState): SideBetOutcome | null => {
+    const wager = roundState.sideBetWager ?? 0;
+    if (activeRules.gameMode === "freeBet") {
+      return resolvePotOfGoldSideBet(roundState.potOfGoldLammers ?? 0, wager, sideBetTitle);
+    }
+    return resolvePairSideBet(roundState.sideBetSeedCards ?? [], wager, sideBetTitle);
+  };
+
+  const canStillCollectPotOfGoldToken = (roundState: RoundState): boolean => {
+    if (activeRules.gameMode !== "freeBet") return false;
+    if (roundState.phase !== "playerTurn") return false;
+
+    return roundState.playerHands.some((hand) => {
+      if (hand.stood) return false;
+      const value = evaluateHand(hand.cards);
+      if (value.isBust) return false;
+      if (hand.cards.length !== 2) return false;
+
+      const [firstCard, secondCard] = hand.cards;
+      if (!firstCard || !secondCard) return false;
+
+      const isFreeSplitCandidate = firstCard.rank === secondCard.rank && cardNumericValue(firstCard) !== 10;
+      const isFreeDoubleCandidate = !value.isSoft && value.total >= 9 && value.total <= 11;
+      return isFreeSplitCandidate || isFreeDoubleCandidate;
+    });
+  };
+
   const handleDeal = () => {
     if (round && round.phase !== "roundOver") {
       setMessage("Finish the current round first.");
@@ -253,24 +314,31 @@ function App() {
       setMessage(validationError);
       return;
     }
-    const replenishedShoe = ensureShoe(shoe, activeRules);
-    const didReshuffle = replenishedShoe !== shoe;
-    if (didReshuffle) {
-      setIsShuffling(true);
-      if (shuffleTimeoutRef.current) clearTimeout(shuffleTimeoutRef.current);
-      shuffleTimeoutRef.current = setTimeout(() => {
-        setIsShuffling(false);
-      }, SHUFFLE_ANIMATION_MS);
+    const sideBetValidationError = validateSideBet(sideBet, bet);
+    if (sideBetValidationError) {
+      setMessage(sideBetValidationError);
+      return;
     }
-    const started = startRound(replenishedShoe, bet);
+    setCurrentRoundSideBetWon(null);
+    const replenishedShoe = ensureShoe(shoe, activeRules);
+    const started = startRound(replenishedShoe, bet, sideBet);
     const startedRoundOutcomes =
       started.round.phase === "roundOver" ? resolveOutcomes(started.round, activeRules) : null;
+    const resolveSideBetNow = activeRules.gameMode !== "freeBet" || started.round.phase === "roundOver";
+    const sideBetOutcome = resolveSideBetNow ? resolveCurrentSideBet(started.round) : null;
     const immediateReturnedCredits =
       startedRoundOutcomes?.reduce((sum, entry) => sum + entry.returnedCredits, 0) ?? 0;
+    const sideBetReturnedCredits = sideBetOutcome?.returnedCredits ?? 0;
+    const sideBetSummary = sideBetOutcome
+      ? sideBetOutcome.won
+        ? `${sideBetTitle}: ${sideBetOutcome.payoutLabel} (+${sideBetOutcome.returnedCredits})`
+        : `${sideBetTitle}: ${sideBetOutcome.payoutLabel} (+0)`
+      : null;
+    setCurrentRoundSideBetWon(sideBetOutcome ? sideBetOutcome.won : null);
     setShoe(started.shoe);
     setRound(started.round);
     triggerDealAnimation(null, DEAL_ANIMATION_MS, INITIAL_DEAL_CARD_ANIMATION_MS);
-    setCredits((value) => value - bet + immediateReturnedCredits);
+    setCredits((value) => value - bet - sideBet + immediateReturnedCredits + sideBetReturnedCredits);
     setFeedbackHistory([]);
     setLastRecommendation(null);
     setHoleCardRevealed(false);
@@ -278,7 +346,7 @@ function App() {
       const outcomeText = startedRoundOutcomes
         .map((entry, index) => `Hand ${index + 1}: ${entry.result} (+${entry.returnedCredits})`)
         .join(" | ");
-      setMessage(`Round complete. ${outcomeText}`);
+      setMessage(sideBetSummary ? `Round complete. ${outcomeText} | ${sideBetSummary}` : `Round complete. ${outcomeText}`);
     } else {
       setMessage("Round started.");
     }
@@ -357,6 +425,9 @@ function App() {
           doubled: false,
           isSplitHand: true,
         });
+        if (isFreeBetSplit) {
+          splitRound.potOfGoldLammers = (splitRound.potOfGoldLammers ?? 0) + 1;
+        }
 
         setRound(splitRound);
         setMessage(isFreeBetSplit ? "You split for free" : "You split");
@@ -389,12 +460,22 @@ function App() {
           DRAW_ANIMATION_MS,
           DRAW_CARD_ANIMATION_MS,
         );
-        setRound({
+        const splitAces = leftCard.rank === "A";
+        if (splitAces) {
+          splitRound.playerHands[round.activeHandIndex].stood = true;
+          splitRound.playerHands[round.activeHandIndex + 1].stood = true;
+        }
+        const finishedRound = {
           ...splitRound,
           dealerHand: [...splitRound.dealerHand],
           playerHands: splitRound.playerHands.map((value) => ({ ...value, cards: [...value.cards] })),
-        });
-        setShoe(nextShoe);
+        };
+        const settled = splitAces ? settleIfDone(finishedRound, nextShoe, activeRules) : { round: finishedRound, shoe: nextShoe };
+        setRound(settled.round);
+        setShoe(settled.shoe);
+        if (splitAces) {
+          setMessage(settled.round.message);
+        }
         setSplitAnimating(false);
       };
 
@@ -431,35 +512,73 @@ function App() {
     setMessage(applied.result.feedbackMessage);
   };
 
+  const potOfGoldMarkedDead =
+    activeRules.gameMode === "freeBet" &&
+    !!round &&
+    (round.potOfGoldLammers ?? 0) === 0 &&
+    !canStillCollectPotOfGoldToken(round);
+
+  const displaySideBetWon = potOfGoldMarkedDead ? false : currentRoundSideBetWon;
+
   return (
     <main className="app">
       <div className="layout">
         <div className={gameMode === "freeBet" ? "game-surface free-bet" : "game-surface"}>
           <p className="table-message">{message}</p>
           <p className="credits-hud">Credits: {credits}</p>
-          <div className={isShuffling ? "shoe-stack shuffling" : "shoe-stack"} aria-hidden="true">
-            {[0, 1, 2, 3, 4].map((index) =>
-              cardImageMap.BACK ? (
-                <img
-                  key={index}
-                  src={cardImageMap.BACK}
-                  alt=""
-                  className={`shoe-stack-card shoe-stack-card-${index + 1}`}
-                />
-              ) : (
-                <span key={index} className={`shoe-stack-card shoe-stack-card-${index + 1} shoe-stack-fallback`}>
-                  ?
-                </span>
-              ),
-            )}
-          </div>
-          <div className="card-counter-hud" aria-label="Cards remaining in shoe">
-            <span className="card-counter-icon" aria-hidden="true">
-              A♠
-            </span>
-            <span>
-              {shoe.length}/{initialShoeSize}
-            </span>
+          <div className="side-bet-odds-hud" aria-label={`${sideBetTitle} payouts`}>
+            <p className="side-bet-odds-title">{sideBetTitle}</p>
+            <table className="side-bet-odds-table" aria-hidden="true">
+              <tbody>
+                {gameMode === "freeBet" ? (
+                  <>
+                    <tr>
+                      <td>7 Tokens</td>
+                      <td>1000:1</td>
+                    </tr>
+                    <tr>
+                      <td>6 Tokens</td>
+                      <td>300:1</td>
+                    </tr>
+                    <tr>
+                      <td>5 Tokens</td>
+                      <td>100:1</td>
+                    </tr>
+                    <tr>
+                      <td>4 Tokens</td>
+                      <td>60:1</td>
+                    </tr>
+                    <tr>
+                      <td>3 Tokens</td>
+                      <td>30:1</td>
+                    </tr>
+                    <tr>
+                      <td>2 Tokens</td>
+                      <td>10:1</td>
+                    </tr>
+                    <tr>
+                      <td>1 Token</td>
+                      <td>3:1</td>
+                    </tr>
+                  </>
+                ) : (
+                  <>
+                    <tr>
+                      <td>Mixed Pair</td>
+                      <td>7:1</td>
+                    </tr>
+                    <tr>
+                      <td>Colored Pair</td>
+                      <td>15:1</td>
+                    </tr>
+                    <tr>
+                      <td>Perfect Pair</td>
+                      <td>30:1</td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
           </div>
           <div className="training-overlay">
             <div className="game-mode-toggle" role="group" aria-label="Game mode">
@@ -493,6 +612,8 @@ function App() {
           <div className="table-zone">
             <TableView
               round={round}
+              sideBetWon={displaySideBetWon}
+              sideBetTitle={sideBetTitle}
               gameMode={gameMode}
               cardImageMap={cardImageMap}
               dealAnimationActive={dealAnimationActive}
@@ -530,7 +651,11 @@ function App() {
             <BetControls
               credits={credits}
               bet={bet}
-              onBetChange={setBet}
+              sideBet={sideBet}
+              sideBetWon={displaySideBetWon}
+              sideBetTitle={sideBetTitle}
+              onBetChange={handleBetChange}
+              onSideBetChange={handleSideBetChange}
               disabled={round !== null && round.phase !== "roundOver"}
               round={round}
             />

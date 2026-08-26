@@ -7,6 +7,8 @@ const DEAL_CARD_STAGGER_MS = 120;
 
 interface TableViewProps {
   round: RoundState | null;
+  sideBetWon: boolean | null;
+  sideBetTitle: string;
   gameMode: "classic" | "freeBet";
   cardImageMap: Record<string, string>;
   dealAnimationActive: boolean;
@@ -136,6 +138,8 @@ const CardStrip = ({
 
 export const TableView = ({
   round,
+  sideBetWon,
+  sideBetTitle,
   gameMode,
   cardImageMap,
   dealAnimationActive,
@@ -148,11 +152,7 @@ export const TableView = ({
   splitAnimating,
 }: TableViewProps) => {
   if (!round) {
-    return (
-      <section className="panel table-panel">
-        <p>Place a bet and click Deal to start.</p>
-      </section>
-    );
+    return <section className="panel table-panel" />;
   }
 
   const dealerValue = evaluateHand(round.dealerHand);
@@ -212,6 +212,11 @@ export const TableView = ({
                 {value.isBust ? <span className="bad"> Bust!</span> : null}
               </p>
               <p>Bet: {hand.bet}</p>
+              {index === 0 && round.sideBetWager && round.sideBetWager > 0 ? (
+                <p className={sideBetWon === false ? "side-bet-lost" : undefined}>
+                  {sideBetTitle}: {round.sideBetWager}
+                </p>
+              ) : null}
             </div>
           );
         })}
