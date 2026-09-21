@@ -216,7 +216,7 @@ function App() {
       cancelled = true;
       dealerAnimationRunningRef.current = false;
     };
-  }, [activeRules, round?.phase, shoe]);
+  }, [activeRules, round?.phase]);
 
   const validateBet = (candidateBet: number): string | null => {
     if (!Number.isFinite(candidateBet)) return "Enter a valid bet.";
