@@ -13,7 +13,7 @@ Build and start the production container with Docker Compose:
 docker compose up -d --build
 ```
 
-The app will be available at `http://SERVER_IP:8080`. From another machine on
+The app will be available at `http://SERVER_IP:8081`. From another machine on
 the same network, replace `SERVER_IP` with the server's LAN IP address.
 
 To use the default HTTP port instead:
@@ -35,11 +35,11 @@ Check the container and its HTTP health endpoint with:
 
 ```sh
 docker compose ps
-curl http://localhost:8080/healthz
+curl http://localhost:8081/healthz
 ```
 
 If the server has a firewall enabled, allow the selected port, for example:
 
 ```sh
-sudo ufw allow 8080/tcp
+sudo ufw allow 8081/tcp
 ```
