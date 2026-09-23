@@ -348,7 +348,7 @@ function App() {
         .join(" | ");
       setMessage(sideBetSummary ? `Round complete. ${outcomeText} | ${sideBetSummary}` : `Round complete. ${outcomeText}`);
     } else {
-      setMessage("Round started.");
+      setMessage(sideBetSummary ? `Round started. ${sideBetSummary}` : "Round started.");
     }
   };
 
